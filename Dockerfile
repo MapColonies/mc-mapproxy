@@ -60,6 +60,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     "boto3" \
     "sqlalchemy"
 
+# Apply MapProxy patches
+# Uses a bind mount so the patch file is never written into an image layer —
+# only the result (the overwritten site-packages file) is committed.
+# Set PATCH_FILES=false at build time to skip (e.g. for upstream compat tests).
+ARG PATCH_FILES=true
+RUN --mount=type=bind,source=config/patch/redis.py,target=/tmp/redis_patch.py \
+    if [ "${PATCH_FILES}" = "true" ]; then \
+    cp /tmp/redis_patch.py \
+    /opt/venv/lib/python3.11/site-packages/mapproxy/cache/redis.py && \
+    echo "[patch] redis.py applied"; \
+    fi
+
 # ── Runtime Stage ───────────────────────────────────────────────────────────
 FROM python:3.11-slim-bookworm
 
@@ -128,6 +140,13 @@ ENV CORS_ENABLED="true" \
     CORS_ALLOWED_ORIGIN="*" \
     CORS_ALLOWED_HEADERS="*" \
     CORS_ALLOWED_METHODS="GET,OPTIONS"
+
+# Environment defaults — Redis resilience
+# Short timeouts ensure a slow/unreachable Redis never stalls a tile request;
+# errors return False (cache-miss) so MapProxy falls back to the next source.
+ENV SOCKET_TIMEOUT_SECONDS="0.1" \
+    SOCKET_CONNECTION_TIMEOUT_SECONDS="0.1" \
+    REDIS_TLS="false"
 
 # Environment defaults — uWSGI tuning
 ENV PROCESSES="6" \
