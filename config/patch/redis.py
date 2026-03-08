@@ -25,10 +25,11 @@
 #  • Optional TLS support via REDIS_TLS / SSL_CERTS_REQS env vars.
 #
 # Env vars (all optional — the defaults keep the original behaviour):
-#   SOCKET_TIMEOUT_SECONDS            – per-operation timeout  (default: 0.1 s)
-#   SOCKET_CONNECTION_TIMEOUT_SECONDS – connect timeout        (default: 0.1 s)
-#   REDIS_TLS                         – enable TLS             (default: false)
-#   SSL_CERTS_REQS                    – ssl_cert_reqs value    (default: None)
+#   SOCKET_TIMEOUT_SECONDS            – per-operation timeout       (default: 0.1 s)
+#   SOCKET_CONNECTION_TIMEOUT_SECONDS – connect timeout             (default: 0.1 s)
+#   REDIS_POOL_TIMEOUT                – max wait for a free conn    (default: 0.1 s)
+#   REDIS_TLS                         – enable TLS                  (default: false)
+#   SSL_CERT_REQS                     – ssl_cert_reqs value         (default: required)
 # ─────────────────────────────────────────────────────────────────────────────
 
 from __future__ import absolute_import
@@ -79,14 +80,20 @@ class RedisCache(TileCacheBase):
             os.environ.get('SOCKET_CONNECTION_TIMEOUT_SECONDS', 0.1)
         )
 
+        # Max time (s) to wait for a free connection from the pool before giving up.
+        self.pool_timeout = float(os.environ.get('REDIS_POOL_TIMEOUT', 0.1))
+
         # SSL: enabled when cert+key files are provided (upstream behaviour), or
         # when REDIS_TLS=true is set (e.g. for servers that don't require client certs).
         ssl_enabled = all([self.ssl_certfile, self.ssl_keyfile]) or get_redis_variable("REDIS_TLS")
         _ssl_certfile = self.ssl_certfile if ssl_enabled else None
         _ssl_keyfile = self.ssl_keyfile if ssl_enabled else None
         _ssl_ca_certs = self.ssl_ca_certs if ssl_enabled and self.ssl_ca_certs else None
+        # ssl_cert_reqs: controls server-cert verification ('required', 'optional', 'none').
+        # Defaults to 'required'; set SSL_CERT_REQS=none to disable (e.g. self-signed certs).
+        _ssl_cert_reqs = os.environ.get('SSL_CERT_REQS', 'required') if ssl_enabled else None
 
-        self.r = redis.StrictRedis(
+        pool = redis.ConnectionPool(
             host=host,
             port=port,
             db=db,
@@ -94,11 +101,14 @@ class RedisCache(TileCacheBase):
             password=password,
             socket_timeout=self.socket_timeout,
             socket_connect_timeout=self.socket_connection_timeout,
+            timeout=self.pool_timeout,
             ssl=ssl_enabled,
             ssl_certfile=_ssl_certfile,
             ssl_keyfile=_ssl_keyfile,
             ssl_ca_certs=_ssl_ca_certs,
+            ssl_cert_reqs=_ssl_cert_reqs,
         )
+        self.r = redis.StrictRedis(connection_pool=pool)
 
     def _key(self, tile):
         x, y, z = tile.coord
