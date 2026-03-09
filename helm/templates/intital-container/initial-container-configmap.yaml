@@ -1,0 +1,34 @@
+{{- if .Values.mapproxy.enabled -}}
+{{- $chartName := include "mapproxy.name" . -}}
+{{- $releaseName := .Release.Name -}}
+{{- $initConfigmapName := include "init-configmap.fullname" . -}}
+{{- $db := (include "common.db.merged" .) | fromYaml }}
+{{- $s3 := (include "common.s3.merged" .) | fromYaml }}
+{{- $storage := (include "common.storage.merged" .) | fromYaml }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $initConfigmapName }}
+  labels:
+    app: {{ $releaseName }}-{{ $chartName }}
+    component: init-container-configmap
+    environment: {{ .Values.environment }}
+    release: {{ $releaseName }}
+data:
+  LOG_LEVEL: {{ .Values.initContainer.env.logLevel | quote }}
+  CONFIG_PROVIDER: {{ $storage.mapproxyConfigProvider }}
+  S3_ENDPOINT_URL: {{ $s3.endpointUrl }}
+  S3_BUCKET: {{ $s3.tilesBucket }}
+  S3_SSL_ENABLED: {{ $s3.sslEnabled | quote }}
+  DB_HOST: {{ $db.host }}
+  DB_NAME: {{ $db.name }}
+  DB_SCHEMA: {{ $db.schema }}
+  DB_PORT: {{ $db.port | quote }}
+  DB_SSL_ENABLE: {{ $db.sslEnabled | quote }}
+  DB_SSL_REJECT_UNAUTHORIZED: {{ $db.rejectUnauthorized | quote }}
+  DB_SSL_PATH_CA: {{ .Values.initContainer.env.ssl.CA_FILE_LOCATION }}
+  DB_SSL_PATH_KEY: {{ .Values.initContainer.env.ssl.KEY_FILE_LOCATION }}
+  DB_SSL_PATH_CERT: {{ .Values.initContainer.env.ssl.CERT_FILE_LOCATION }}
+  UWSGI_INI: {{ tpl (.Files.Get "config/mapProxyUwsgi.ini") . | quote }}
+  LOG_INI: {{ tpl (.Files.Get "config/log.ini") . | quote }}
+{{- end }}

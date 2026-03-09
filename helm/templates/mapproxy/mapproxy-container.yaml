@@ -1,0 +1,105 @@
+{{- define "mapproxy-chart.mapproxy-container" }}
+{{- $configmapName := include "configmap.fullname" . -}}
+{{- $storage := (include "common.storage.merged" .) | fromYaml }}
+{{- $fs := (include "common.fs.merged" .) | fromYaml }}
+{{- $metrics := (include "common.metrics.merged" .) | fromYaml }}
+        - name: mapproxy
+          image: {{ .cloudProviderDockerRegistryUrl }}{{ .Values.mapproxy.image.repository }}:{{ .Values.mapproxy.image.tag }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }} 
+          env:
+            - name: REDIS_TLS
+              value: {{ .Values.mapproxy.redis.tls | quote }}
+            - name: SOCKET_CONNECTION_TIMEOUT_SECONDS
+              value: {{ .Values.mapproxy.socket.connectionTimeoutSeconds | quote }}
+            - name: SOCKET_TIMEOUT_SECONDS
+              value: {{ .Values.mapproxy.socket.timeoutSeconds | quote }}
+            {{- if .Values.global.ca.secretName }}
+            - name: REQUESTS_CA_BUNDLE
+              value: {{ printf "%s/%s" .Values.global.ca.path .Values.global.ca.key | quote }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: {{ printf "%s/%s" .Values.global.ca.path .Values.global.ca.key | quote }}
+            {{- end }}
+            {{- if eq (upper $storage.tilesStorageProvider) "S3" }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .s3SecretName }}
+                  key: accessKeyId
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .s3SecretName }}
+                  key: secretAccessKey
+            {{- end }}
+            # uWSGI tuning — picked up by entrypoint.sh
+            - name: PROCESSES
+              value: {{ .Values.mapproxy.uwsgi.processes | quote }}
+            - name: THREADS
+              value: {{ .Values.mapproxy.uwsgi.threads | quote }}
+            - name: HARAKIRI
+              value: {{ .Values.mapproxy.uwsgi.harakiri | quote }}
+            {{- if $metrics.enabled }}
+            # Stats server for uwsgi-exporter / Prometheus
+            - name: UWSGI_STATS_ENABLED
+              value: "true"
+            - name: UWSGI_STATS_PORT
+              value: {{ .Values.mapproxy.uwsgi.statsServer.stats | quote }}
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name:  {{ $configmapName }}
+          {{- if .resources.enabled }}
+          resources:
+            {{- toYaml .resources.value | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+          - name: shared-config
+            mountPath: /uwsgi_config
+          - mountPath: /mapproxy/mapproxy.yaml
+            name: mapproxy-config
+            subPath: mapproxy.yaml
+          {{- if .Values.global.ca.secretName }}
+          - mountPath: {{ printf "%s/%s" .Values.global.ca.path .Values.global.ca.key | quote }}
+            name: root-ca
+            subPath: {{ quote .Values.global.ca.key }}
+          {{- end }}
+          {{- if .Values.authentication.ssl.enabled }}
+          - name: open-ssl
+            mountPath: "/etc/ssl/openssl.cnf"
+            subPath: "openssl.cnf"
+          {{- end }}
+          - mountPath: "/mapproxy/uwsgi.ini"
+            name: uwsgi-config
+            subPath: uwsgi.ini
+          - mountPath: "/mapproxy/log.ini"
+            name: uwsgi-config
+            subPath: log.ini
+          {{- if $fs.internalPvc.enabled}}
+          - mountPath: /layerSources
+            name: sources-storage
+            subPath: {{ $fs.internalPvc.tilesSubPath }}
+          {{- end }}
+          ports:
+            - name: uwsgi
+              containerPort: {{ .Values.mapproxy.uwsgi.socket }}
+              protocol: TCP
+            - name: http
+              containerPort: {{ .Values.mapproxy.targetPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.mapproxy.targetPort }}
+            initialDelaySeconds: {{ .Values.initialDelaySeconds }}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /service?REQUEST=GetCapabilities&SERVICE=WMTS
+              port: {{ .Values.mapproxy.targetPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+{{- end }}

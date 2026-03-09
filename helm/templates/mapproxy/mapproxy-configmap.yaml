@@ -1,0 +1,51 @@
+{{- if .Values.mapproxy.enabled -}}
+{{- $chartName := include "mapproxy.name" . -}}
+{{- $releaseName := .Release.Name -}}
+{{- $configmapName := include "configmap.fullname" . -}}
+{{- $s3 := (include "common.s3.merged" .) | fromYaml }}
+{{- $tracing := (include "common.tracing.merged" .) | fromYaml }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configmapName }}
+  labels:
+    app: {{ $releaseName }}-{{ $chartName }}
+    component: map-proxy-configmap
+    environment: {{ .Values.environment }}
+    release: {{ $releaseName }}
+data:
+  # ── Storage / S3 ─────────────────────────────────────────────────────────
+  S3_ENDPOINT_URL: {{ $s3.endpointUrl }}
+  S3_BUCKET:  {{ $s3.tilesBucket }}
+  AWS_HTTPS: {{ $s3.sslEnabled | quote }}
+  # ── Telemetry / Tracing ───────────────────────────────────────────────────
+  TELEMETRY_TRACING_ENABLED: {{ $tracing.enabled | quote }}
+  TELEMETRY_TRACING_ENDPOINT: {{ $tracing.url | quote }}
+  TELEMETRY_TRACING_SAMPLING_RATIO_DENOMINATOR: {{ $tracing.samplingRatioDenominator | quote }}
+  TELEMETRY_BOTO_ENABLED: {{ .Values.mapproxy.env.telemetry.boto.enabled | quote }}
+  TELEMETRY_BOTO_CAPTURE_HEADERS: {{ .Values.mapproxy.env.telemetry.boto.captureHeaders | quote }}
+  TELEMETRY_HTTP_ENABLED: {{ .Values.mapproxy.env.telemetry.http.enabled | quote }}
+  TELEMETRY_SQL_ENABLED: {{ .Values.mapproxy.env.telemetry.sql.enabled | quote }}
+  TELEMETRY_TILE_CACHE_ENABLED: {{ .Values.mapproxy.env.telemetry.tileCache.enabled | quote }}
+  # Enable ConsoleSpanExporter for local debugging; set false in production.
+  OTEL_TRACE_DEBUG: {{ .Values.mapproxy.env.telemetry.traceDebug | quote }}
+  # ── CORS ──────────────────────────────────────────────────────────────────
+  CORS_ENABLED: {{ .Values.mapproxy.env.cors.enabled | quote }}
+  CORS_ALLOWED_HEADERS: {{ template "map-proxy.cors.allowedHeaders" . }}
+  CORS_ALLOWED_ORIGIN: {{ .Values.mapproxy.env.cors.allowedOrigin | quote }}
+  CORS_ALLOWED_METHODS: {{ .Values.mapproxy.env.cors.allowedMethods | quote }}
+  # ── Redis resilience ──────────────────────────────────────────────────────
+  # SOCKET_TIMEOUT_SECONDS / SOCKET_CONNECTION_TIMEOUT_SECONDS / REDIS_TLS
+  # are set directly in the container env spec (mapproxy-container.yaml).
+  REDIS_POOL_TIMEOUT: {{ .Values.mapproxy.redis.poolTimeout | quote }}
+  {{- if .Values.mapproxy.redis.tls }}
+  SSL_CERT_REQS: {{ .Values.mapproxy.redis.sslCertReqs | quote }}
+  {{- end }}
+  # ── Authentication ────────────────────────────────────────────────────────
+  AUTH_ENABLED: {{ .Values.nginx.authorization.enabled | quote }}
+  {{- if (and .Values.global.opalaEnabled .Values.nginx.authorization.enabled) }}
+  AUTH_VALID_DOMAIN: {{ .Values.nginx.authorization.wms.domain | quote }}
+  AUTH_HEADER_NAME: {{ .Values.mapproxy.env.cors.allowedHeaders | quote }}
+  AUTH_QUERY_NAME: {{ .Values.nginx.authorization.token.queryName | quote }}
+  {{- end }}
+{{- end }}
