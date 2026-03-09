@@ -68,8 +68,12 @@ ARG PATCH_FILES=true
 RUN --mount=type=bind,source=config/patch/redis.py,target=/tmp/redis_patch.py \
     if [ "${PATCH_FILES}" = "true" ]; then \
     cp /tmp/redis_patch.py \
-    /opt/venv/lib/python3.11/site-packages/mapproxy/cache/redis.py && \
-    echo "[patch] redis.py applied"; \
+    /opt/venv/lib/python3.11/site-packages/mapproxy/cache/redis.py \
+    && python -c "import mapproxy.cache.redis" \
+    && echo "[patch] redis.py applied and import verified OK" \
+    || { echo "[patch] redis.py FAILED — build aborted" >&2; exit 1; }; \
+    else \
+    echo "[patch] PATCH_FILES=false — redis.py patch skipped (upstream file unchanged)"; \
     fi
 
 # ── Runtime Stage ───────────────────────────────────────────────────────────

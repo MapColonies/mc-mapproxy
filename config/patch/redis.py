@@ -93,7 +93,10 @@ class RedisCache(TileCacheBase):
         # Defaults to 'required'; set SSL_CERT_REQS=none to disable (e.g. self-signed certs).
         _ssl_cert_reqs = os.environ.get('SSL_CERT_REQS', 'required') if ssl_enabled else None
 
-        pool = redis.ConnectionPool(
+        # Build pool kwargs conditionally — redis-py 5.x passes unrecognised kwargs
+        # straight through to AbstractConnection.__init__(), which does not accept
+        # 'ssl', 'ssl_certfile', etc.  Only include them when SSL is actually in use.
+        pool_kwargs = dict(
             host=host,
             port=port,
             db=db,
@@ -102,12 +105,17 @@ class RedisCache(TileCacheBase):
             socket_timeout=self.socket_timeout,
             socket_connect_timeout=self.socket_connection_timeout,
             timeout=self.pool_timeout,
-            ssl=ssl_enabled,
-            ssl_certfile=_ssl_certfile,
-            ssl_keyfile=_ssl_keyfile,
-            ssl_ca_certs=_ssl_ca_certs,
-            ssl_cert_reqs=_ssl_cert_reqs,
         )
+        if ssl_enabled:
+            pool_kwargs.update(
+                ssl=True,
+                ssl_certfile=_ssl_certfile,
+                ssl_keyfile=_ssl_keyfile,
+                ssl_ca_certs=_ssl_ca_certs,
+                ssl_cert_reqs=_ssl_cert_reqs,
+            )
+
+        pool = redis.BlockingConnectionPool(**pool_kwargs)
         self.r = redis.StrictRedis(connection_pool=pool)
 
     def _key(self, tile):
