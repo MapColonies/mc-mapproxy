@@ -75,31 +75,18 @@
             name: uwsgi-config
             subPath: log.ini
           {{- if $fs.internalPvc.enabled}}
-          - mountPath: /layerSources
-            name: sources-storage
+          - name: internal-storage
+            mountPath: {{ $fs.internalPvc.mountPath }}
             subPath: {{ $fs.internalPvc.tilesSubPath }}
           {{- end }}
           ports:
             - name: uwsgi
               containerPort: {{ .Values.mapproxy.uwsgi.socket }}
               protocol: TCP
-            - name: http
-              containerPort: {{ .Values.mapproxy.targetPort }}
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: {{ .Values.mapproxy.targetPort }}
-            initialDelaySeconds: {{ .Values.initialDelaySeconds }}
-            periodSeconds: 30
-            timeoutSeconds: 5
-            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /service?REQUEST=GetCapabilities&SERVICE=WMTS
               port: {{ .Values.mapproxy.targetPort }}
-            initialDelaySeconds: 30
-            periodSeconds: 15
+            initialDelaySeconds: 15
             timeoutSeconds: 5
-            failureThreshold: 3
 {{- end }}
