@@ -58,7 +58,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     "opentelemetry-instrumentation-psycopg2" \
     "psycopg2-binary" \
     "boto3" \
-    "sqlalchemy"
+    "sqlalchemy" \
+    "celery[redis]"
 
 # Apply MapProxy patches
 # Uses a bind mount so the patch file is never written into an image layer —
