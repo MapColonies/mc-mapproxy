@@ -125,7 +125,11 @@ mapproxy:
   redis:
     tls: false
     poolTimeout: 0.1
+    healthCheckInterval: 0
     sslCertReqs: "required"
+  s3:
+    maxAttempts: 1
+    retryMode: standard
   wms:
     enabled: false
     replicaCount: 1

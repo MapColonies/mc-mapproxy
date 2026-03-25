@@ -13,6 +13,8 @@
               value: {{ .Values.mapproxy.socket.connectionTimeoutSeconds | quote }}
             - name: SOCKET_TIMEOUT_SECONDS
               value: {{ .Values.mapproxy.socket.timeoutSeconds | quote }}
+            - name: REDIS_HEALTH_CHECK_INTERVAL
+              value: {{ .Values.mapproxy.redis.healthCheckInterval | quote }}
             {{- if .Values.global.ca.secretName }}
             - name: REQUESTS_CA_BUNDLE
               value: {{ printf "%s/%s" .Values.global.ca.path .Values.global.ca.key | quote }}
@@ -30,6 +32,10 @@
                 secretKeyRef:
                   name: {{ .s3SecretName }}
                   key: secretAccessKey
+            - name: AWS_MAX_ATTEMPTS
+              value: {{ .Values.mapproxy.s3.maxAttempts | quote }}
+            - name: AWS_RETRY_MODE
+              value: {{ .Values.mapproxy.s3.retryMode | quote }}
             {{- end }}
             # uWSGI tuning — picked up by entrypoint.sh
             - name: PROCESSES
