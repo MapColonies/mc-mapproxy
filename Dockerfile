@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     "psycopg2-binary" \
     "boto3" \
     "sqlalchemy" \
-    "celery[redis]"
+    "redis[hiredis]"
 
 # Apply MapProxy patches
 # Uses a bind mount so the patch file is never written into an image layer —
@@ -75,6 +75,17 @@ RUN --mount=type=bind,source=config/patch/redis.py,target=/tmp/redis_patch.py \
     || { echo "[patch] redis.py FAILED — build aborted" >&2; exit 1; }; \
     else \
     echo "[patch] PATCH_FILES=false — redis.py patch skipped (upstream file unchanged)"; \
+    fi
+
+RUN --mount=type=bind,source=config/patch/s3.py,target=/tmp/s3_patch.py \
+    if [ "${PATCH_FILES}" = "true" ]; then \
+    cp /tmp/s3_patch.py \
+    /opt/venv/lib/python3.11/site-packages/mapproxy/cache/s3.py \
+    && python -c "import mapproxy.cache.s3" \
+    && echo "[patch] s3.py applied and import verified OK" \
+    || { echo "[patch] s3.py FAILED — build aborted" >&2; exit 1; }; \
+    else \
+    echo "[patch] PATCH_FILES=false — s3.py patch skipped (upstream file unchanged)"; \
     fi
 
 # ── Runtime Stage ───────────────────────────────────────────────────────────
