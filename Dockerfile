@@ -155,6 +155,7 @@ ENV SOCKET_TIMEOUT_SECONDS="0.1" \
     SOCKET_CONNECTION_TIMEOUT_SECONDS="0.1" \
     REDIS_POOL_TIMEOUT="0.1" \
     REDIS_TLS="false" \
+    REDIS_HEALTH_CHECK_INTERVAL="0" \
     SSL_CERT_REQS="required"
 
 # Environment defaults — uWSGI tuning

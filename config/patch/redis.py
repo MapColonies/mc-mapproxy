@@ -55,21 +55,30 @@ class RedisCache(TileCacheBase):
 
         ssl_enabled = get_redis_variable("REDIS_TLS")
         cert_reqs = os.environ.get("SSL_CERT_REQS", None)
+        health_check_interval = int(os.environ.get("REDIS_HEALTH_CHECK_INTERVAL", "0"))
 
-        self.r = redis.StrictRedis(
-            host=host,
-            port=port,
-            db=db,
-            username=username,
-            password=password,
-            socket_timeout=self.socket_timeout,
-            socket_connect_timeout=self.socket_connection_timeout,
-            ssl=ssl_enabled,
-            ssl_cert_reqs=cert_reqs,
-            ssl_certfile=ssl_certfile,
-            ssl_keyfile=ssl_keyfile,
-            ssl_ca_certs=ssl_ca_certs,
-        )
+        redis_kwargs = {
+            "host": host,
+            "port": port,
+            "db": db,
+            "password": password,
+            "socket_timeout": self.socket_timeout,
+            "socket_connect_timeout": self.socket_connection_timeout,
+            "socket_keepalive": True,
+            "health_check_interval": health_check_interval,
+            "ssl": ssl_enabled,
+            "ssl_cert_reqs": cert_reqs,
+            "ssl_certfile": ssl_certfile,
+            "ssl_keyfile": ssl_keyfile,
+            "ssl_ca_certs": ssl_ca_certs,
+            "retry_on_timeout": False,
+        }
+
+        if username:
+            redis_kwargs["username"] = username
+
+        self.r = redis.StrictRedis(**redis_kwargs)
+
 
     def _key(self, tile):
         x, y, z = tile.coord
@@ -83,6 +92,9 @@ class RedisCache(TileCacheBase):
         try:
             log.debug('exists_key, key: %s' % key)
             return self.r.exists(key)
+        except redis.exceptions.TimeoutError as e:
+            log.error('REDIS:exists_key timeout error, returning false. %s' % e)
+            return False
         except redis.exceptions.ConnectionError as e:
             log.error('Error during connection %s' % e)
             return False  
@@ -101,6 +113,9 @@ class RedisCache(TileCacheBase):
         try:
             log.debug('store_key, key: %s' % key)
             r = self.r.set(key, data)
+        except redis.exceptions.TimeoutError as e:
+            log.error('REDIS:store_key timeout error, returning false. %s' % e)
+            return False
         except redis.exceptions.ConnectionError as e:
             log.error('Error during connection %s' % e)
             return False  
@@ -126,6 +141,9 @@ class RedisCache(TileCacheBase):
                 tile.source = ImageSource(BytesIO(tile_data))
                 return True
             return False
+        except redis.exceptions.TimeoutError as e:
+            log.error('REDIS:get_key timeout error, returning false. %s' % e)
+            return False
         except redis.exceptions.ConnectionError as e:
             log.error('Error during connection %s' % e)
             return False  
@@ -136,20 +154,29 @@ class RedisCache(TileCacheBase):
     def load_tile_metadata(self, tile, dimensions=None):
         if tile.timestamp:
             return
-        pipe = self.r.pipeline()
-        pipe.ttl(self._key(tile))
-        pipe.memory_usage(self._key(tile))
-        pipe_res = pipe.execute()
-        tile.timestamp = time.mktime(datetime.datetime.now().timetuple()) - self.ttl - int(pipe_res[0])
-        tile.size = pipe_res[1]
+        try:
+            pipe = self.r.pipeline()
+            pipe.ttl(self._key(tile))
+            pipe.memory_usage(self._key(tile))
+            pipe_res = pipe.execute()
+            tile.timestamp = time.mktime(datetime.datetime.now().timetuple()) - self.ttl - int(pipe_res[0])
+            tile.size = pipe_res[1]
+        except (redis.exceptions.TimeoutError, redis.exceptions.ConnectionError, Exception) as e:
+            log.error('REDIS:load_tile_metadata error %s' % e)
+            # Fail silently so the worker doesn't crash.
+            pass
         
     def remove_tile(self, tile, dimensions=None):
         if tile.coord is None:
             return True
 
         key = self._key(tile)
-        self.r.delete(key)
-        return True
+        try:
+            self.r.delete(key)
+            return True
+        except (redis.exceptions.TimeoutError, redis.exceptions.ConnectionError, Exception) as e:
+            log.error('REDIS:remove_tile error %s' % e)
+            return False
 
 def get_redis_variable(name):
     env_var = os.environ.get(name, "false")
