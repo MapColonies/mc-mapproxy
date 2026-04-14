@@ -18,6 +18,7 @@ data:
   S3_ENDPOINT_URL: {{ $s3.endpointUrl }}
   S3_BUCKET:  {{ $s3.tilesBucket }}
   AWS_HTTPS: {{ $s3.sslEnabled | quote }}
+  S3_USERNAME: {{ $s3.username | quote }}
   # ── Telemetry / Tracing ───────────────────────────────────────────────────
   TELEMETRY_TRACING_ENABLED: {{ $tracing.enabled | quote }}
   TELEMETRY_TRACING_ENDPOINT: {{ $tracing.url | quote }}

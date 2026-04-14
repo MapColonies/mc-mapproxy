@@ -345,7 +345,6 @@ The container starts uWSGI with the following fixed flags (not configurable at r
 | `--socket 0.0.0.0:3031`      | uwsgi binary protocol — use as nginx upstream                          |
 | `--http-socket 0.0.0.0:8080` | plain HTTP — use for liveness probes and direct access                 |
 | `--master`                   | master process manages workers                                         |
-| `--cheaper 2`                | idle-scale down to 2 workers                                           |
 | `--lazy-app`                 | workers load `app.py` **after** fork — required for OTel thread safety |
 | `--harakiri 120`             | kill workers that take > 120 s                                         |
 | `--max-requests 1000`        | recycle worker after 1000 requests                                     |

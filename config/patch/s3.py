@@ -16,15 +16,18 @@
 
 import calendar
 import hashlib
+import io
+import os
 import sys
 import threading
+
+import urllib3
 
 from mapproxy.image import ImageSource
 from mapproxy.cache import path
 from mapproxy.cache.base import tile_buffer, TileCacheBase
 from mapproxy.util import async_
 from mapproxy.util.py import reraise_exception
-from urllib import request as urllib2
 
 try:
     import boto3
@@ -37,6 +40,7 @@ import logging
 log = logging.getLogger('mapproxy.cache.s3')
 
 
+_http = urllib3.PoolManager(block=True)
 _s3_sessions_cache = threading.local()
 
 
@@ -66,6 +70,8 @@ class S3Cache(TileCacheBase):
         self.endpoint_url = endpoint_url
         self.access_control_list = access_control_list
         self.use_http_get = use_http_get
+        self.username = os.environ.get('S3_USERNAME')
+
 
         try:
             self.bucket = self.conn().head_bucket(Bucket=bucket_name)
@@ -91,6 +97,8 @@ class S3Cache(TileCacheBase):
         if self.endpoint_url:
             # Self-hosted S3: scheme is taken from endpoint_url
             base = self.endpoint_url.rstrip('/')
+            if self.username:
+                return f"{base}/{self.username}:{self.bucket_name}/{key}"
             return f"{base}/{self.bucket_name}/{key}"
         else:
             # AWS S3: always HTTPS
@@ -123,15 +131,18 @@ class S3Cache(TileCacheBase):
     def is_cached(self, tile, dimensions=None):
         if tile.is_missing():
             if self.use_http_get:
+                url = self.get_bucket_url(tile)
                 try:
-                    req = urllib2.Request(self.get_bucket_url(tile))
-                    response = urllib2.urlopen(req)
-                    self._set_metadata(response.info(), tile)
-                except urllib2.HTTPError as e:
-                    if e.code == 403 or e.code == 404:
-                        log.debug('S3: is_cached HTTP %s, url: %s' % (e.code, self.get_bucket_url(tile)))
+                    response = _http.request('HEAD', url)
+                    if response.status in (403, 404):
+                        log.debug('S3: is_cached HTTP %s, url: %s' % (response.status, url))
                         return False
-                    log.error('S3: is_cached HTTP error, url: %s, status: %s' % (self.get_bucket_url(tile), e.code))
+                    if response.status != 200:
+                        log.error('S3: is_cached HTTP error, url: %s, status: %s' % (url, response.status))
+                        raise Exception('S3 HTTP error %s for url: %s' % (response.status, url))
+                    self._set_metadata(response.headers, tile)
+                except urllib3.exceptions.HTTPError as e:
+                    log.error('S3: is_cached request error, url: %s, error: %s' % (url, e))
                     raise
             else:
                 key = self.tile_key(tile)
@@ -157,14 +168,18 @@ class S3Cache(TileCacheBase):
         log.debug('S3:load_tile, key: %s' % key)
 
         if self.use_http_get:
+            url = self.get_bucket_url(tile)
             try:
-                req = urllib2.Request(self.get_bucket_url(tile))
-                tile.source = ImageSource(urllib2.urlopen(req))
-            except urllib2.HTTPError as e:
-                if e.code == 403 or e.code == 404:
-                    log.debug('S3: load_tile HTTP %s, url: %s' % (e.code, self.get_bucket_url(tile)))
+                response = _http.request('GET', url)
+                if response.status in (403, 404):
+                    log.debug('S3: load_tile HTTP %s, url: %s' % (response.status, url))
                     return False
-                log.error('S3: load_tile HTTP error, url: %s, status: %s' % (self.get_bucket_url(tile), e.code))
+                if response.status != 200:
+                    log.error('S3: load_tile HTTP error, url: %s, status: %s' % (url, response.status))
+                    raise Exception('S3 HTTP error %s for url: %s' % (response.status, url))
+                tile.source = ImageSource(io.BytesIO(response.data))
+            except urllib3.exceptions.HTTPError as e:
+                log.error('S3: load_tile request error, url: %s, error: %s' % (url, e))
                 raise
         else:
             try:

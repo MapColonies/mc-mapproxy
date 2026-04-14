@@ -54,6 +54,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     "opentelemetry-instrumentation-botocore" \
     "opentelemetry-instrumentation-requests" \
     "opentelemetry-instrumentation-urllib3" \
+    "opentelemetry-instrumentation-urllib" \
     "opentelemetry-instrumentation-sqlalchemy" \
     "opentelemetry-instrumentation-psycopg2" \
     "psycopg2-binary" \
