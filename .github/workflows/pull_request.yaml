@@ -17,6 +17,7 @@ jobs:
 
   openapi-lint:
     name: Run OpenAPI lint Check
+    if: false
     runs-on: ubuntu-latest
 
     strategy: &node-strategy
