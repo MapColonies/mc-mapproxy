@@ -26,10 +26,6 @@ data:
   TELEMETRY_TRACING_ENABLED: 'true'
   TELEMETRY_TRACING_URL: {{ $tracing.url }}
   {{ end }}
-  {{ if $metrics.enabled }}
-  TELEMETRY_METRICS_ENABLED: 'true'
-  TELEMETRY_METRICS_URL: {{ $metrics.url }}
-  {{ end }}
   SERVER_PORT: {{ .Values.mapproxinator.targetPort | quote }}
   CONFIG_PROVIDER: {{ $storage.mapproxyConfigProvider | quote }}
   POLL_TIMEOUT_FREQUENCY_MS: {{ .Values.mapproxinator.env.poll.timeout.frequencyMS | quote }}

@@ -31,7 +31,7 @@ data:
   OTEL_TRACE_DEBUG: {{ .Values.mapproxy.env.telemetry.traceDebug | quote }}
   # ── CORS ──────────────────────────────────────────────────────────────────
   CORS_ENABLED: {{ .Values.mapproxy.env.cors.enabled | quote }}
-  CORS_ALLOWED_HEADERS: {{ template "map-proxy.cors.allowedHeaders" . }}
+  CORS_ALLOWED_HEADERS: {{ template "mapproxy.cors.allowedHeaders" . }}
   CORS_ALLOWED_ORIGIN: {{ .Values.mapproxy.env.cors.allowedOrigin | quote }}
   CORS_ALLOWED_METHODS: {{ .Values.mapproxy.env.cors.allowedMethods | quote }}
   # ── Redis resilience ──────────────────────────────────────────────────────

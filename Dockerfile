@@ -169,8 +169,8 @@ RUN useradd -m -u 1000 -s /bin/bash mapproxy && \
 WORKDIR /mapproxy
 
 # Copy application code and entrypoint (single layer, correct ownership)
-COPY --chown=mapproxy:mapproxy src/app.py       /mapproxy/app.py
-COPY --chown=mapproxy:mapproxy entrypoint.sh    /mapproxy/entrypoint.sh
+COPY --chown=mapproxy:mapproxy src/app.py /mapproxy/app.py
+COPY --chown=mapproxy:mapproxy entrypoint.sh /mapproxy/entrypoint.sh
 
 # Fix permissions: mapproxy owns /mapproxy, group 0 can read/write (OpenShift)
 RUN chown -R mapproxy:mapproxy /mapproxy && \
