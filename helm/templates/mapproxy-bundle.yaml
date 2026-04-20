@@ -1,0 +1,100 @@
+{{- define "mapproxy-chart.mapproxy-bundle" }}
+  {{- $db := (include "common.db.merged" .) | fromYaml }}
+  {{- $fs := (include "common.fs.merged" .) | fromYaml }}
+  {{- $s3 := (include "common.s3.merged" .) | fromYaml }}
+  {{- $initConfigmapName := include "init-configmap.fullname" . -}}
+  {{- $cloudProviderDockerRegistryUrl := include "mapproxy.cloudProviderDockerRegistryUrl" . -}}
+  {{- $cloudProviderImagePullSecretName := include "mapproxy.cloudProviderImagePullSecretName" . -}}
+  {{- $sslSecretName := ternary .Values.authentication.ssl.externalSecretName (printf "%s%s" .Release.Name "-open-ssl") .Values.authentication.ssl.useExternal }}
+  {{- $postgresSecretName := ternary $db.secrets.externalSecretName (printf "%s%s" .Release.Name "-postgres-secret") $db.secrets.useExternal }}
+  {{- $s3SecretName := ternary $s3.secretName (printf "%s%s" .Release.Name  "-s3-secret") (ne $s3.secretName "") }}
+  {{- $metrics := (include "common.metrics.merged" .) | fromYaml }}
+  replicas: {{ .replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .chartName }}-{{ .type }}
+      release: {{ .releaseName }}-{{ .type }}
+      run: {{ .releaseName }}-{{ .chartName }}-{{ .type }}
+      {{ include "mapproxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ .chartName }}-{{ .type }}
+        release: {{ .releaseName }}-{{ .type }}
+        run: {{ .releaseName }}-{{ .chartName }}-{{ .type }}
+        {{ include "mapproxy.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.resetOnConfigChange }}
+        checksum/configmap: {{
+          include (print $.Template.BasePath "/mapproxy/mapproxy-configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if .Values.podAnnotations }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- end }}
+        {{ include "mclabels.annotations" . | nindent 8 }}
+    spec:
+    {{- if $cloudProviderImagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ $cloudProviderImagePullSecretName | quote }}
+    {{- end }}
+      initContainers:
+        ######################################################### Init Container Deployment #########################################################
+        {{- template "mapproxy-chart.init-container" (merge (dict "releaseName" .releaseName "chartName" .chartName "cloudProviderDockerRegistryUrl" $cloudProviderDockerRegistryUrl "s3SecretName" $s3SecretName "postgresSecretName" $postgresSecretName) .)}}
+      containers:
+        ######################################################### MapProxy Deployment #########################################################
+        {{- template "mapproxy-chart.mapproxy-container" (merge (dict "releaseName" .releaseName "chartName" .chartName "cloudProviderDockerRegistryUrl" $cloudProviderDockerRegistryUrl "s3SecretName" $s3SecretName "resources" .resources) .) }}
+        ######################################################### Mapproxinator Deployment #########################################################
+        {{- template "mapproxy-chart.mapproxinator-container" (merge (dict "releaseName" .releaseName "chartName" .chartName "cloudProviderDockerRegistryUrl" $cloudProviderDockerRegistryUrl "s3SecretName" $s3SecretName "postgresSecretName" $postgresSecretName) .) }}
+         ######################################################### uwsgi Deployment #########################################################
+        {{- if $metrics.enabled }}
+        {{- template "mapproxy-chart.uwsgi-exporter-container" (merge (dict "releaseName" .releaseName "chartName" .chartName "cloudProviderDockerRegistryUrl" $cloudProviderDockerRegistryUrl "resources" .Values.uwsgiExporter.resources) .) }}
+        {{- end }}
+      volumes:
+        - name: mapproxy-config
+          emptyDir: {}
+        - name: shared-config
+          emptyDir: {}
+        {{- if $db.sslEnabled }}
+        - name: ca-file
+          secret:
+            secretName: {{ $postgresSecretName }}
+            items:
+              - key: caFile
+                path: ca.pem
+        - name: key-file
+          secret:
+            secretName: {{ $postgresSecretName }}
+            items:
+              - key: keyFile
+                path: key.pem
+        - name: cert-file
+          secret:
+            secretName: {{ $postgresSecretName }}
+            items:
+              - key: certFile
+                path: cert.pem
+        {{- end }}    
+        {{- if .Values.global.ca.secretName }}
+        - name: root-ca
+          secret:
+            secretName: {{ .Values.global.ca.secretName }}
+        {{- end }}                
+        {{- if .Values.authentication.ssl.enabled }}
+        - name: open-ssl
+          secret:
+            secretName: {{ $sslSecretName }}
+        {{- end }}
+        - name: uwsgi-config
+          configMap:
+            name: {{ $initConfigmapName }}
+            items:
+            - key: "UWSGI_INI"
+              path: "uwsgi.ini"
+            - key: "LOG_INI"
+              path: "log.ini"
+        {{- if $fs.internalPvc.enabled }}
+        - name: internal-storage
+          persistentVolumeClaim:
+            claimName: {{ $fs.internalPvc.name }}
+        {{- end }}
+{{- end }}
