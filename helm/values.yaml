@@ -238,8 +238,8 @@ nginx:
   fullnameOverride: ""
   replicaCount: 1
   image:
-    repository: nginx
-    tag: "latest"
+    repository: common/nginx
+    tag: "v2.1.5"
   volume:
     storage: 1000Mi
     accessModes: ReadWriteOnce
@@ -296,6 +296,15 @@ nginx:
   - name: nginx-config
     mountPath: "/etc/nginx/nginx.mapproxy.wmts.conf"
     subPath: nginx.mapproxy.wmts.conf
+  - name: nginx-config
+    mountPath: "/etc/nginx/conf.d/mapproxy-http.conf"
+    subPath: mapproxy-http.conf
+  - name: nginx-config
+    mountPath: "/etc/nginx/conf.d/extensions/mapproxy-server.conf"
+    subPath: mapproxy-server.conf
+  - name: nginx-config
+    mountPath: "/etc/nginx/conf.d/extensions/mapproxy-location.conf"
+    subPath: mapproxy-location.conf
   - name: cache
     mountPath: "/cache"
 
@@ -333,6 +342,39 @@ nginx:
       requests:
         cpu: 100m
         memory: 128Mi
+
+  opentelemetry:
+    serviceName: mapproxy-nginx
+    exporterHost: ""
+    exporterPort: 4317
+    samplerMethod: "AlwaysOff"
+    ratio: 10
+
+  mclabels:
+    environment: development
+    owner: raster
+    partOf: serving
+    component: proxy-server
+    prometheus:
+      enabled: true
+      port: 9113
+    logScraping: true
+
+  prometheusExporter:
+    enabled: true
+    image:
+      repository: common/nginx/nginx-prometheus-exporter
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      enabled: true
+      value:
+        limits:
+          cpu: 100m
+          memory: 128Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi
 
 mapproxinator:
   enabled: true

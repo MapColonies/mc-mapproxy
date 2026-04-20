@@ -1,9 +1,9 @@
 dependencies:
 - name: nginx
-  repository: oci://acrarolibotnonprod.azurecr.io/helm
-  version: 1.3.0
+  repository: oci://acrarolibotnonprod.azurecr.io/helm/common
+  version: 2.1.5
 - name: mclabels
   repository: oci://acrarolibotnonprod.azurecr.io/helm/infra
   version: 1.0.1
-digest: sha256:203d416e0ea2a03b34d63342f008d383ddac700f19dec743082cb88563a3a942
-generated: "2026-03-09T20:30:20.388877147+02:00"
+digest: sha256:7ca0818ab720e09a7fbd9fde77e6c896a9e6292745caa6d8e5f7ef6407e0e3c0
+generated: "2026-04-19T11:23:42.152712168+03:00"
