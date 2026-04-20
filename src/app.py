@@ -178,8 +178,6 @@ except Exception:
 def _redis_request_hook(span, instance, args, kwargs):
     if not span or not span.is_recording():
         return
-    if args:
-        span.set_attribute("db.redis.command", str(args[0]).upper())
     if len(args) > 1:
         key = args[1].decode("utf-8", errors="replace") if isinstance(args[1], bytes) else str(args[1])
         span.set_attribute("db.redis.key", key[:500])
@@ -237,8 +235,6 @@ else:
 def _boto_request_hook(span, service_name, operation_name, api_params):
     if not span or not span.is_recording():
         return
-    span.set_attribute("aws.service", service_name)
-    span.set_attribute("rpc.method", operation_name)
     if service_name == "s3":
         if "Bucket" in api_params:
             span.set_attribute("aws.s3.bucket", api_params["Bucket"])
