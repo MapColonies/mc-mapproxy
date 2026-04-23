@@ -253,6 +253,15 @@ nginx:
     expirationTime: 60m
     useTempPath: "off"
 
+  nginx:
+    extensions:
+      server:
+        enabled: true
+        fileName: mapproxy-server.conf
+      location:
+        enabled: true
+        fileName: mapproxy-location.conf
+
   port: 8080
   internalServicePort: 80
   nginxTargetPort: 8080
@@ -281,12 +290,6 @@ nginx:
 
   extraVolumeMounts:
   - name: nginx-config
-    mountPath: "/etc/nginx/conf.d/default.conf"
-    subPath: default.conf
-  - name: nginx-config
-    mountPath: "/etc/nginx/nginx.conf"
-    subPath: nginx.conf
-  - name: nginx-config
     mountPath: "/etc/nginx/log_format.conf"
     subPath: log_format.conf
   - name: nginx-config
@@ -298,12 +301,13 @@ nginx:
   - name: nginx-config
     mountPath: "/etc/nginx/conf.d/mapproxy-http.conf"
     subPath: mapproxy-http.conf
+    # - name: nginx-config
+    #   mountPath: "/etc/nginx/conf.d/extensions/mapproxy-server.conf"
+    #subPath: mapproxy-server.conf
   - name: nginx-config
-    mountPath: "/etc/nginx/conf.d/extensions/mapproxy-server.conf"
-    subPath: mapproxy-server.conf
-  - name: nginx-config
-    mountPath: "/etc/nginx/conf.d/extensions/mapproxy-location.conf"
-    subPath: mapproxy-location.conf
+    mountPath: "/etc/nginx/conf.d/extensions"
+    # mountPath: "/etc/nginx/conf.d/extensions/mapproxy-location.conf"
+    # subPath: mapproxy-location.conf
   - name: cache
     mountPath: "/cache"
 
@@ -315,7 +319,6 @@ nginx:
     timeout:
       enabled: false # defaults to 30s by openshift
       duration: 60s # supported units (us, ms, s, m, h, d)
-    rewriteTarget: ""
     tls:
       enabled: true
       useCerts: false
@@ -360,7 +363,7 @@ nginx:
     logScraping: true
 
   prometheusExporter:
-    enabled: true
+    enabled: false
     image:
       repository: common/nginx/nginx-prometheus-exporter
       tag: latest
