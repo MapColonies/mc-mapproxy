@@ -161,14 +161,12 @@ ENV CORS_ENABLED="true" \
 # Environment defaults — Redis resilience
 # Short timeouts ensure a slow/unreachable Redis never stalls a tile request;
 # errors return False (cache-miss) so MapProxy falls back to the next source.
-# REDIS_POOL_TIMEOUT: max seconds to wait for a free connection from the pool.
 # SSL_CERT_REQS: server-cert verification ('required'/'optional'/'none').
 ENV SOCKET_TIMEOUT_SECONDS="0.1" \
     SOCKET_CONNECTION_TIMEOUT_SECONDS="0.1" \
-    REDIS_POOL_TIMEOUT="0.1" \
     REDIS_TLS="false" \
     REDIS_HEALTH_CHECK_INTERVAL="0" \
-    SSL_CERT_REQS="required"
+    SSL_CERT_REQS="optional"
 
 # Environment defaults — uWSGI tuning
 ENV PROCESSES="6" \

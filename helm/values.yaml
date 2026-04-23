@@ -126,9 +126,8 @@ mapproxy:
     timeoutSeconds: 0.1 # Set a operation timeout nonnegative, floating point number expressing *seconds*.
   redis:
     tls: false
-    poolTimeout: 0.1
     healthCheckInterval: 0
-    sslCertReqs: "required"
+    sslCertReqs: "optional" ## 'required'/'optional'/'none'
   s3:
     maxAttempts: 1
     retryMode: standard
@@ -187,14 +186,14 @@ mapproxy:
     telemetry:
       traceDebug: false # set true locally to enable ConsoleSpanExporter
       boto:
-        enabled: true
+        enabled: false
         captureHeaders: false
       http:
         enabled: true
       sql:
-        enabled: true
+        enabled: false
       tileCache:
-        enabled: true
+        enabled: false
     ssl:
       # external paths
       CA_DIR: /opt/certs/ca/
