@@ -127,7 +127,7 @@ mapproxy:
   redis:
     tls: false
     healthCheckInterval: 0
-    sslCertReqs: "optional" ## 'required'/'optional'/'none'
+    sslCertReqs: "optional" # 'required'/'optional'/'none'
   s3:
     maxAttempts: 1
     retryMode: standard
