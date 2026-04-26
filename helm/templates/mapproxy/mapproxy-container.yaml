@@ -37,11 +37,6 @@
             - name: AWS_RETRY_MODE
               value: {{ .Values.mapproxy.s3.retryMode | quote }}
             {{- end }}
-            # uWSGI tuning — picked up by entrypoint.sh
-            - name: PROCESSES
-              value: {{ .Values.mapproxy.uwsgi.processes | quote }}
-            - name: THREADS
-              value: {{ .Values.mapproxy.uwsgi.threads | quote }}
             - name: HARAKIRI
               value: {{ .Values.mapproxy.uwsgi.harakiri | quote }}
             {{- if $metrics.enabled }}

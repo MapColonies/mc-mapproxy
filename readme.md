@@ -18,7 +18,7 @@ MapProxy running under **uWSGI**, instrumented with **OpenTelemetry** (traces, m
   - [Metrics](#metrics)
   - [Log Correlation](#log-correlation)
   - [Instrumentation Summary](#instrumentation-summary)
-- [CORS](#cors)
+- [HTTP Source Options](#http-source-options)
 - [uWSGI Tuning](#uwsgi-tuning)
 - [Health Check](#health-check)
 - [Building the Image Locally](#building-the-image-locally)
@@ -122,11 +122,11 @@ globals:
 
 #### MapProxy
 
-| Variable          | Default                          | Description                                                                             |
-| ----------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
-| `MAPPROXY_CONFIG` | `/mapproxy/config/mapproxy.yaml` | Path to the MapProxy configuration file                                                 |
-| `LOG_CONFIG`      | `/mapproxy/config/log.ini`       | Path to a Python `logging.config` ini file; falls back to `basicConfig` if not present |
-| `SERVICE_VERSION` | *(set to `MAPPROXY_VERSION` at build time)* | Version string reported as `service.version` in OTel resource attributes  |
+| Variable          | Default                                     | Description                                                                            |
+| ----------------- | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `MAPPROXY_CONFIG` | `/mapproxy/config/mapproxy.yaml`            | Path to the MapProxy configuration file                                                |
+| `LOG_CONFIG`      | `/mapproxy/config/log.ini`                  | Path to a Python `logging.config` ini file; falls back to `basicConfig` if not present |
+| `SERVICE_VERSION` | _(set to `MAPPROXY_VERSION` at build time)_ | Version string reported as `service.version` in OTel resource attributes               |
 
 #### uWSGI
 
@@ -137,16 +137,16 @@ globals:
 
 #### OpenTelemetry — General
 
-| Variable                      | Default           | Description                                          |
-| ----------------------------- | ----------------- | ---------------------------------------------------- |
-| `OTEL_SERVICE_NAME`           | `mapproxy`        | Service name reported to the collector               |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317`  | OTLP gRPC endpoint — **bare `host:port`, no scheme** |
-| `OTEL_TRACES_EXPORTER`        | `otlp`            | Traces exporter type                                 |
-| `OTEL_METRICS_EXPORTER`       | `otlp`            | Metrics exporter type                                |
-| `OTEL_LOGS_EXPORTER`          | `otlp`            | Logs exporter type                                   |
-| `OTEL_PROPAGATORS`            | `tracecontext,baggage,b3` | Trace context propagation formats          |
-| `OTEL_PYTHON_LOG_CORRELATION` | `false`           | Kept for reference; log correlation is managed directly by `app.py` — changing this has no effect |
-| `PYTHONUNBUFFERED`            | `1`               | Flush logs immediately                               |
+| Variable                      | Default                   | Description                                                                                       |
+| ----------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `OTEL_SERVICE_NAME`           | `mapproxy`                | Service name reported to the collector                                                            |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317`          | OTLP gRPC endpoint — **bare `host:port`, no scheme**                                              |
+| `OTEL_TRACES_EXPORTER`        | `otlp`                    | Traces exporter type                                                                              |
+| `OTEL_METRICS_EXPORTER`       | `otlp`                    | Metrics exporter type                                                                             |
+| `OTEL_LOGS_EXPORTER`          | `otlp`                    | Logs exporter type                                                                                |
+| `OTEL_PROPAGATORS`            | `tracecontext,baggage,b3` | Trace context propagation formats                                                                 |
+| `OTEL_PYTHON_LOG_CORRELATION` | `false`                   | Kept for reference; log correlation is managed directly by `app.py` — changing this has no effect |
+| `PYTHONUNBUFFERED`            | `1`                       | Flush logs immediately                                                                            |
 
 #### OpenTelemetry — Tracing
 
@@ -165,15 +165,6 @@ globals:
 | `TELEMETRY_HTTP_ENABLED`         | `true`  | Instrument outbound `requests` and `urllib3` calls             |
 | `TELEMETRY_SQL_ENABLED`          | `true`  | Instrument SQLite3, SQLAlchemy, and psycopg2 queries           |
 | `TELEMETRY_TILE_CACHE_ENABLED`   | `true`  | Monkey-patch `FileCache` to emit spans for filesystem tile I/O |
-
-#### CORS
-
-| Variable               | Default       | Description                              |
-| ---------------------- | ------------- | ---------------------------------------- |
-| `CORS_ENABLED`         | `true`        | Add CORS headers to every response       |
-| `CORS_ALLOWED_ORIGIN`  | `*`           | Value for `Access-Control-Allow-Origin`  |
-| `CORS_ALLOWED_HEADERS` | `*`           | Value for `Access-Control-Allow-Headers` |
-| `CORS_ALLOWED_METHODS` | `GET,OPTIONS` | Value for `Access-Control-Allow-Methods` |
 
 ---
 
@@ -269,7 +260,7 @@ docker compose up -d
 
 ### Traces
 
-Every inbound HTTP request is wrapped in a span by `OpenTelemetryMiddleware` (outermost layer, inside CORS). Spans are exported in OTLP gRPC format to `OTEL_EXPORTER_OTLP_ENDPOINT`.
+Every inbound HTTP request is wrapped in a span by `OpenTelemetryMiddleware` (outermost WSGI layer). Spans are exported in OTLP gRPC format to `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 The `BatchSpanProcessor` is initialised **after** uWSGI forks workers (`--lazy-app`). This is required — initialising the processor in the master process causes its background export thread to die silently on fork.
 
@@ -328,11 +319,44 @@ or:
 
 ---
 
-## CORS
+## HTTP Source Options
 
-CORS is handled by a lightweight inline middleware (no extra dependencies). It runs as the outermost WSGI layer, deduplicating any headers already added by MapProxy's own `access_control_allow_origin` setting to prevent double headers.
+MapProxy's `http` block in `mapproxy.yaml` controls HTTP behaviour for sources.
 
-Pre-flight `OPTIONS` requests are short-circuited with `200 OK` before reaching MapProxy.
+### Custom Request Headers
+
+Use `http.headers` to add custom headers to every request MapProxy sends to a source:
+
+```yaml
+globals:
+  http:
+    access_control_allow_origin: ""
+    headers:
+      X-Custom-Header: my-value
+      Authorization: Bearer token123
+```
+
+### HTTPS / SSL
+
+MapProxy supports HTTPS sources — use `https://` in the source URL. By default MapProxy verifies the server certificate against your system's CA bundle.
+
+Provide a custom CA bundle:
+
+```yaml
+http:
+  ssl_ca_certs: /etc/ssl/certs/ca-certificates.crt
+```
+
+Disable certificate verification (not recommended for production):
+
+```yaml
+http:
+  ssl_no_cert_checks: true
+```
+
+`ssl_no_cert_checks` can also be set at the individual source level.
+
+> See the [MapProxy HTTP configuration docs](https://mapproxy.github.io/mapproxy/latest/configuration.html#http) for the full reference.
 
 ---
 
@@ -351,8 +375,6 @@ The container starts uWSGI with the following fixed flags (not configurable at r
 | `--reload-on-rss 2048`       | recycle worker if RSS exceeds 2 GB                                     |
 | `--die-on-term`              | map `SIGTERM` → graceful shutdown (correct k8s behaviour)              |
 | `--vacuum`                   | clean up sockets on exit                                               |
-
-Worker count and thread count are set at runtime via `PROCESSES` and `THREADS`.
 
 ---
 
@@ -399,9 +421,9 @@ The image uses a **multi-stage build**: all compile-time dependencies (GCC, GDAL
 
 ## Volumes
 
-| Mount path         | Access    | Description                                        |
-| ------------------ | --------- | -------------------------------------------------- |
-| `/mapproxy/config` | Read-only | MapProxy YAML + optional `log.ini`                 |
+| Mount path         | Access    | Description                        |
+| ------------------ | --------- | ---------------------------------- |
+| `/mapproxy/config` | Read-only | MapProxy YAML + optional `log.ini` |
 
 Tile data directories (e.g. `/outputs`, `/layerSources`) are **not** declared as volumes — mount them as PVCs or host paths via your orchestrator.
 

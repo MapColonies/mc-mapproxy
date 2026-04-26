@@ -105,13 +105,3 @@ Returns the cloud provider image pull secret name from global if exists or from 
 {{- end -}}
 {{- end -}}
 
-{{- define "map-proxy.cors.allowedHeaders" -}}
-{{- $headerList := list -}}
-{{- if ne .Values.mapproxy.env.cors.allowedHeaders "" -}}
-{{- range $k, $v := (split "," .Values.mapproxy.env.cors.allowedHeaders) -}}
-{{- $headerList = append $headerList $v -}}
-{{- end -}}
-{{- $headerList = uniq $headerList -}}
-{{-  quote (join "," $headerList) -}}
-{{- end -}}
-{{- end -}}

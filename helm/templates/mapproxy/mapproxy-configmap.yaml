@@ -30,11 +30,6 @@ data:
   TELEMETRY_TILE_CACHE_ENABLED: {{ .Values.mapproxy.env.telemetry.tileCache.enabled | quote }}
   # Enable ConsoleSpanExporter for local debugging; set false in production.
   OTEL_TRACE_DEBUG: {{ .Values.mapproxy.env.telemetry.traceDebug | quote }}
-  # ── CORS ──────────────────────────────────────────────────────────────────
-  CORS_ENABLED: {{ .Values.mapproxy.env.cors.enabled | quote }}
-  CORS_ALLOWED_HEADERS: {{ template "map-proxy.cors.allowedHeaders" . }}
-  CORS_ALLOWED_ORIGIN: {{ .Values.mapproxy.env.cors.allowedOrigin | quote }}
-  CORS_ALLOWED_METHODS: {{ .Values.mapproxy.env.cors.allowedMethods | quote }}
   # ── Redis resilience ──────────────────────────────────────────────────────
   # SOCKET_TIMEOUT_SECONDS / SOCKET_CONNECTION_TIMEOUT_SECONDS / REDIS_TLS
   # are set directly in the container env spec (mapproxy-container.yaml).
@@ -46,7 +41,6 @@ data:
   AUTH_ENABLED: {{ .Values.nginx.authorization.enabled | quote }}
   {{ if (and (.Values.global.opalaEnabled) (.Values.nginx.authorization.enabled))}}
   AUTH_VALID_DOMAIN: {{ .Values.nginx.authorization.wms.domain | quote }}
-  AUTH_HEADER_NAME: {{ .Values.mapproxy.env.cors.allowedHeaders | quote }}
   AUTH_QUERY_NAME: {{ .Values.nginx.authorization.token.queryName | quote }}
   {{- end }}
 {{- end }}

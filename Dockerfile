@@ -152,12 +152,6 @@ ENV TELEMETRY_TRACING_ENABLED="true" \
     TELEMETRY_SQL_ENABLED="true" \
     TELEMETRY_TILE_CACHE_ENABLED="true"
 
-# Environment defaults — CORS
-ENV CORS_ENABLED="true" \
-    CORS_ALLOWED_ORIGIN="*" \
-    CORS_ALLOWED_HEADERS="*" \
-    CORS_ALLOWED_METHODS="GET,OPTIONS"
-
 # Environment defaults — Redis resilience
 # Short timeouts ensure a slow/unreachable Redis never stalls a tile request;
 # errors return False (cache-miss) so MapProxy falls back to the next source.
@@ -169,10 +163,6 @@ ENV SOCKET_TIMEOUT_SECONDS="0.1" \
     REDIS_TLS="false" \
     REDIS_HEALTH_CHECK_INTERVAL="0" \
     SSL_CERT_REQS="required"
-
-# Environment defaults — uWSGI tuning
-ENV PROCESSES="6" \
-    THREADS="10"
 
 # Create non-root user and working directory
 RUN useradd -m -u 1000 -s /bin/bash mapproxy && \
