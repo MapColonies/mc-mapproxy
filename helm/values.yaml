@@ -287,7 +287,9 @@ nginx:
   extraVolumes:
   - name: nginx-config
     configMap:
-      name: "{{ .Release.Name }}-nginx-configmap"
+      # must match nginx-configmap.fullname (<release>-<chart>-nginx-configmap);
+      # tpl runs in the nginx subchart context, so the chart name is spelled out
+      name: "{{ .Release.Name }}-mapproxy-nginx-configmap"
   - name: cache #TODO: Find solution to mount cache volume with condition
     emptyDir:
       sizeLimit: "{{ .Values.volume.storage }}"
