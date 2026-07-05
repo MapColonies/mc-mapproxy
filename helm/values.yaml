@@ -268,6 +268,11 @@ nginx:
   targetPort: 8080
   nodePort: 30003
 
+  # The root location is handled by uwsgi_pass from mapproxy-location.conf,
+  # so the chart's built-in proxy_pass backend must stay off.
+  backend:
+    enabled: false
+
   authorization:
     enabled: false
     url: http://opa-int-opa-service.infra-services/v1/data/http/authz/decision
@@ -301,13 +306,12 @@ nginx:
   - name: nginx-config
     mountPath: "/etc/nginx/conf.d/mapproxy-http.conf"
     subPath: mapproxy-http.conf
-    # - name: nginx-config
-    #   mountPath: "/etc/nginx/conf.d/extensions/mapproxy-server.conf"
-    #subPath: mapproxy-server.conf
   - name: nginx-config
-    mountPath: "/etc/nginx/conf.d/extensions"
-    # mountPath: "/etc/nginx/conf.d/extensions/mapproxy-location.conf"
-    # subPath: mapproxy-location.conf
+    mountPath: "/etc/nginx/conf.d/extensions/mapproxy-server.conf"
+    subPath: mapproxy-server.conf
+  - name: nginx-config
+    mountPath: "/etc/nginx/conf.d/extensions/mapproxy-location.conf"
+    subPath: mapproxy-location.conf
   - name: cache
     mountPath: "/cache"
 
