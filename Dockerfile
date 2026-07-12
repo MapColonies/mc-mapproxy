@@ -164,6 +164,7 @@ ENV CORS_ENABLED="true" \
 # SSL_CERT_REQS: server-cert verification ('required'/'optional'/'none').
 ENV SOCKET_TIMEOUT_SECONDS="0.1" \
     SOCKET_CONNECTION_TIMEOUT_SECONDS="0.1" \
+    REDIS_RETRY_ATTEMPTS="0" \
     REDIS_TLS="false" \
     REDIS_HEALTH_CHECK_INTERVAL="0" \
     SSL_CERT_REQS="optional"

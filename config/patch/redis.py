@@ -29,6 +29,8 @@ from mapproxy.cache.base import (
 
 try:
     import redis
+    from redis.retry import Retry
+    from redis.backoff import NoBackoff
 except ImportError:
     redis = None
 
@@ -56,6 +58,11 @@ class RedisCache(TileCacheBase):
         ssl_enabled = get_redis_variable("REDIS_TLS")
         cert_reqs = os.environ.get("SSL_CERT_REQS", None)
         health_check_interval = int(os.environ.get("REDIS_HEALTH_CHECK_INTERVAL", "0"))
+        # redis-py >= 6 retries every command 3 times with exponential backoff
+        # (1-10s sleeps) by default, so a down Redis stalls each cache call for
+        # ~5s instead of failing within socket_timeout. Zero retries makes a
+        # failed Redis fall through to the next cache immediately.
+        retry_attempts = int(os.environ.get("REDIS_RETRY_ATTEMPTS", "0"))
 
         redis_kwargs = {
             "host": host,
@@ -72,6 +79,7 @@ class RedisCache(TileCacheBase):
             "ssl_keyfile": ssl_keyfile,
             "ssl_ca_certs": ssl_ca_certs,
             "retry_on_timeout": False,
+            "retry": Retry(NoBackoff(), retry_attempts),
         }
 
         if username:
