@@ -140,7 +140,7 @@ globals:
 | Variable                      | Default           | Description                                          |
 | ----------------------------- | ----------------- | ---------------------------------------------------- |
 | `OTEL_SERVICE_NAME`           | `mapproxy`        | Service name reported to the collector               |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317`  | OTLP gRPC endpoint — **bare `host:port`, no scheme** |
+| `TELEMETRY_TRACING_ENDPOINT`  | `localhost:4317`  | OTLP gRPC endpoint — **bare `host:port`, no scheme** |
 | `OTEL_TRACES_EXPORTER`        | `otlp`            | Traces exporter type                                 |
 | `OTEL_METRICS_EXPORTER`       | `otlp`            | Metrics exporter type                                |
 | `OTEL_LOGS_EXPORTER`          | `otlp`            | Logs exporter type                                   |
