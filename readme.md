@@ -1,13 +1,13 @@
-# MapProxy v6.0.1 — Docker Image
+# MapProxy — Docker Image
 
-MapProxy 6.0.1 running under **uWSGI**, instrumented with **OpenTelemetry** (traces, metrics, and log correlation) and exported via OTLP gRPC. Instrumentation covers inbound HTTP, Redis, filesystem tile cache, outbound HTTP, SQL, and AWS/botocore calls.
+MapProxy running under **uWSGI**, instrumented with **OpenTelemetry** (traces, metrics, and log correlation) and exported via OTLP gRPC. Instrumentation covers inbound HTTP, Redis, filesystem tile cache, outbound HTTP, SQL, and AWS/botocore calls.
 
 ---
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Directory Layout](#directory-layout)
+- [Repository Layout](#repository-layout)
 - [Configuration](#configuration)
   - [mapproxy.yaml](#mapproxyyaml)
   - [Environment Variables](#environment-variables)
@@ -20,6 +20,7 @@ MapProxy 6.0.1 running under **uWSGI**, instrumented with **OpenTelemetry** (tra
   - [Instrumentation Summary](#instrumentation-summary)
 - [CORS](#cors)
 - [uWSGI Tuning](#uwsgi-tuning)
+- [Health Check](#health-check)
 - [Building the Image Locally](#building-the-image-locally)
 - [Exposed Ports](#exposed-ports)
 - [Volumes](#volumes)
@@ -52,13 +53,23 @@ MapProxy will be available at `http://localhost:8080/`.
 
 ---
 
-## Directory Layout
+## Repository Layout
 
 ```
 .
-└── config/
-    ├── mapproxy.yaml    ← MapProxy configuration (required, mounted read-only)
-    └── log.ini          ← optional Python logging config (mounted via ConfigMap)
+├── Dockerfile
+├── entrypoint.sh          ← creates /tmp/mapproxy dirs, execs uWSGI as PID 1
+├── .dockerignore
+└── src/
+    └── app.py             ← MapProxy WSGI app + OpenTelemetry instrumentation
+```
+
+**`config/`** is not part of the image — mount it at runtime:
+
+```
+config/
+├── mapproxy.yaml    ← MapProxy configuration (required, mounted read-only)
+└── log.ini          ← optional Python logging config (e.g. via k8s ConfigMap)
 ```
 
 Tile data is **not** stored inside the container. Point `globals.cache.base_dir` in your `mapproxy.yaml` at a PVC or host path and mount it separately.
@@ -111,10 +122,11 @@ globals:
 
 #### MapProxy
 
-| Variable          | Default                          | Description                                                                            |
-| ----------------- | -------------------------------- | -------------------------------------------------------------------------------------- |
-| `MAPPROXY_CONFIG` | `/mapproxy/config/mapproxy.yaml` | Path to the MapProxy configuration file                                                |
-| `LOG_CONFIG`      | `/mapproxy/config/log.ini`       | Path to a Python `logging.config` ini file; falls back to `basicConfig` if not present |
+| Variable          | Default                    | Description                                                                             |
+| ----------------- | -------------------------- | --------------------------------------------------------------------------------------- |
+| `MAPPROXY_CONFIG` | `/mapproxy/mapproxy.yaml`  | Path to the MapProxy configuration file                                                 |
+| `LOG_CONFIG`      | `/mapproxy/log.ini`        | Path to a Python `logging.config` ini file; falls back to `basicConfig` if not present |
+| `SERVICE_VERSION` | *(set to `MAPPROXY_VERSION` at build time)* | Version string reported as `service.version` in OTel resource attributes  |
 
 #### uWSGI
 
@@ -125,16 +137,16 @@ globals:
 
 #### OpenTelemetry — General
 
-| Variable                      | Default                                            | Description                                          |
-| ----------------------------- | -------------------------------------------------- | ---------------------------------------------------- |
-| `OTEL_SERVICE_NAME`           | `mapproxy`                                         | Service name reported to the collector               |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `infra-otel.infra-services.svc.cluster.local:4317` | OTLP gRPC endpoint — **bare `host:port`, no scheme** |
-| `OTEL_TRACES_EXPORTER`        | `otlp`                                             | Traces exporter type                                 |
-| `OTEL_METRICS_EXPORTER`       | `otlp`                                             | Metrics exporter type                                |
-| `OTEL_LOGS_EXPORTER`          | `otlp`                                             | Logs exporter type                                   |
-| `OTEL_PROPAGATORS`            | `tracecontext,baggage,b3`                          | Trace context propagation formats                    |
-| `OTEL_PYTHON_LOG_CORRELATION` | `true`                                             | Inject `trace_id`/`span_id` into log records         |
-| `PYTHONUNBUFFERED`            | `1`                                                | Flush logs immediately                               |
+| Variable                      | Default           | Description                                          |
+| ----------------------------- | ----------------- | ---------------------------------------------------- |
+| `OTEL_SERVICE_NAME`           | `mapproxy`        | Service name reported to the collector               |
+| `TELEMETRY_TRACING_ENDPOINT`  | `localhost:4317`  | OTLP gRPC endpoint — **bare `host:port`, no scheme** |
+| `OTEL_TRACES_EXPORTER`        | `otlp`            | Traces exporter type                                 |
+| `OTEL_METRICS_EXPORTER`       | `otlp`            | Metrics exporter type                                |
+| `OTEL_LOGS_EXPORTER`          | `otlp`            | Logs exporter type                                   |
+| `OTEL_PROPAGATORS`            | `tracecontext,baggage,b3` | Trace context propagation formats          |
+| `OTEL_PYTHON_LOG_CORRELATION` | `false`           | Kept for reference; log correlation is managed directly by `app.py` — changing this has no effect |
+| `PYTHONUNBUFFERED`            | `1`               | Flush logs immediately                               |
 
 #### OpenTelemetry — Tracing
 
@@ -269,11 +281,19 @@ A `MeterProvider` with a `PeriodicExportingMetricReader` (60 s interval) exports
 
 ### Log Correlation
 
-`LoggingInstrumentor` injects `trace_id` and `span_id` into every log record for correlation in Grafana/Tempo/Jaeger:
+`LoggingInstrumentor` injects `otelTraceID` and `otelSpanID` attributes into every `LogRecord`. The log formatter reads those attributes and includes them in every line:
 
 ```
-INFO mapproxy [trace_id=4bf92f3577b34da6 span_id=00f067aa0ba902b7] GET /wmts/... 200
+2026-03-03 12:00:00,123 INFO mapproxy [trace_id=4bf92f3577b34da6 span_id=00f067aa0ba902b7] GET /wmts/... 200
 ```
+
+When no active span exists (e.g. background worker logs) the fields are printed as empty strings:
+
+```
+2026-03-03 12:00:00,456 INFO mapproxy.otel [trace_id= span_id=] [otel-probe] collector REACHABLE at otel-collector:4317
+```
+
+> **`log.ini` users:** if you mount a custom `log.ini`, add `%(otelTraceID)s` and `%(otelSpanID)s` to your formatter's `format` string to preserve correlation. The `_OtelFormatter` fallback only applies to the built-in `basicConfig` path.
 
 ### Instrumentation Summary
 
@@ -293,13 +313,13 @@ INFO mapproxy [trace_id=4bf92f3577b34da6 span_id=00f067aa0ba902b7] GET /wmts/...
 At each worker start `app.py` opens a TCP connection to the collector endpoint and logs the result:
 
 ```
-[otel-probe] collector REACHABLE at infra-otel.infra-services.svc.cluster.local:4317
+[otel-probe] collector REACHABLE at otel-collector:4317
 ```
 
 or:
 
 ```
-[otel-probe] collector UNREACHABLE at … ConnectionRefusedError: … (traces will be dropped until resolved)
+[otel-probe] collector UNREACHABLE at localhost:4317 — ConnectionRefusedError: … (traces will be dropped until resolved)
 ```
 
 #### Debug mode
@@ -325,13 +345,20 @@ The container starts uWSGI with the following fixed flags (not configurable at r
 | `--socket 0.0.0.0:3031`      | uwsgi binary protocol — use as nginx upstream                          |
 | `--http-socket 0.0.0.0:8080` | plain HTTP — use for liveness probes and direct access                 |
 | `--master`                   | master process manages workers                                         |
-| `--cheaper 2`                | idle-scale down to 2 workers                                           |
 | `--lazy-app`                 | workers load `app.py` **after** fork — required for OTel thread safety |
 | `--harakiri 120`             | kill workers that take > 120 s                                         |
 | `--max-requests 1000`        | recycle worker after 1000 requests                                     |
 | `--reload-on-rss 2048`       | recycle worker if RSS exceeds 2 GB                                     |
+| `--die-on-term`              | map `SIGTERM` → graceful shutdown (correct k8s behaviour)              |
+| `--vacuum`                   | clean up sockets on exit                                               |
 
 Worker count and thread count are set at runtime via `PROCESSES` and `THREADS`.
+
+---
+
+## Health Check
+
+The image includes a Docker `HEALTHCHECK` that polls `http://localhost:8080/` every 30 s (5 s timeout, 15 s start period, 3 retries). Kubernetes liveness/readiness probes should target port `8080` directly — no separate endpoint is needed.
 
 ---
 
@@ -339,9 +366,13 @@ Worker count and thread count are set at runtime via `PROCESSES` and `THREADS`.
 
 ```bash
 git clone <this-repo>
-cd upgrade-mapproxy
+cd mc-mapproxy
 
-docker build -t acrarolibotnonprod.azurecr.io/raster/mapproxy:v6.0.1 .
+docker build \
+  --build-arg MAPPROXY_VERSION=6.0.1 \
+  --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --build-arg VCS_REF="$(git rev-parse --short HEAD)" \
+  -t acrarolibotnonprod.azurecr.io/raster/mapproxy:v6.0.1 .
 ```
 
 Push to the registry:
@@ -353,26 +384,28 @@ docker push acrarolibotnonprod.azurecr.io/raster/mapproxy:v6.0.1
 
 The image uses a **multi-stage build**: all compile-time dependencies (GCC, GDAL/GEOS/PROJ headers) are confined to the builder stage and the final image contains only the pre-built `/opt/venv` virtual environment plus shared runtime libraries.
 
+`MAPPROXY_VERSION` is the single source of truth — it is used in `pip install`, the OCI image labels, and the `SERVICE_VERSION` env var read by `app.py` at runtime.
+
 ---
 
 ## Exposed Ports
 
 | Port   | Protocol | Description                                            |
 | ------ | -------- | ------------------------------------------------------ |
-| `3031` | uwsgi    | Binary uwsgi protocol — intended as nginx upstream     |
 | `8080` | HTTP     | Plain HTTP — liveness probes and direct browser access |
+| `3031` | uwsgi    | Binary uwsgi protocol — intended as nginx upstream     |
 
 ---
 
 ## Volumes
 
-| Mount path         | Access    | Description                                            |
-| ------------------ | --------- | ------------------------------------------------------ |
-| `/mapproxy/config` | Read-only | MapProxy YAML + optional `log.ini` (declared `VOLUME`) |
+| Mount path         | Access    | Description                                        |
+| ------------------ | --------- | -------------------------------------------------- |
+| `/mapproxy/config` | Read-only | MapProxy YAML + optional `log.ini`                 |
 
 Tile data directories (e.g. `/outputs`, `/layerSources`) are **not** declared as volumes — mount them as PVCs or host paths via your orchestrator.
 
-uWSGI lock and cache temp files are written to `/tmp/mapproxy/` (created at container start, no volume needed).
+uWSGI lock and cache temp files are written to `/tmp/mapproxy/` (created by `entrypoint.sh` at container start, no volume needed).
 
 ---
 
