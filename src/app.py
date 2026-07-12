@@ -89,7 +89,7 @@ for _sdk_logger in (
 _SERVICE_VERSION       = os.getenv("SERVICE_VERSION", "0.0.0")
 _OTLP_ENDPOINT        = os.getenv("TELEMETRY_TRACING_ENDPOINT", "localhost:4317")
 _TRACING_ENABLED      = os.getenv("TELEMETRY_TRACING_ENABLED", "true").lower() == "true"
-_SAMPLE_DENOM         = int(os.getenv("TELEMETRY_TRACING_SAMPLING_RATIO_DENOMINATOR", "1000"))
+_SAMPLE_DENOM         = max(1, int(os.getenv("TELEMETRY_TRACING_SAMPLING_RATIO_DENOMINATOR", "1000")))
 _TRACE_DEBUG          = os.getenv("OTEL_TRACE_DEBUG", "true").lower() == "true"
 _BOTO_ENABLED         = os.getenv("TELEMETRY_BOTO_ENABLED", "true").lower() == "true"
 _BOTO_CAPTURE_HEADERS = os.getenv("TELEMETRY_BOTO_CAPTURE_HEADERS", "false").lower() == "true"
