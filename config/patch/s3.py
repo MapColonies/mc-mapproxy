@@ -40,7 +40,13 @@ import logging
 log = logging.getLogger('mapproxy.cache.s3')
 
 
-_http = urllib3.PoolManager(block=True)
+# urllib3's default maxsize=1 keeps a single pooled connection per host, so with
+# block=True the concurrent tile fetches issued by load_tiles/store_tiles
+# (async_.Pool) serialize behind that one connection. Size the pool to the batch
+# concurrency (default _concurrent_writer=4, tunable via env) so HTTP-GET/PUT
+# fan-out isn't throttled to one connection.
+_http_pool_maxsize = int(os.environ.get('S3_HTTP_POOL_MAXSIZE', '10'))
+_http = urllib3.PoolManager(maxsize=_http_pool_maxsize, block=True)
 _s3_sessions_cache = threading.local()
 
 
