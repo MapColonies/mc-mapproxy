@@ -122,10 +122,10 @@ globals:
 
 #### MapProxy
 
-| Variable          | Default                          | Description                                                                             |
-| ----------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
-| `MAPPROXY_CONFIG` | `/mapproxy/config/mapproxy.yaml` | Path to the MapProxy configuration file                                                 |
-| `LOG_CONFIG`      | `/mapproxy/config/log.ini`       | Path to a Python `logging.config` ini file; falls back to `basicConfig` if not present |
+| Variable          | Default                    | Description                                                                             |
+| ----------------- | -------------------------- | --------------------------------------------------------------------------------------- |
+| `MAPPROXY_CONFIG` | `/mapproxy/mapproxy.yaml`  | Path to the MapProxy configuration file                                                 |
+| `LOG_CONFIG`      | `/mapproxy/log.ini`        | Path to a Python `logging.config` ini file; falls back to `basicConfig` if not present |
 | `SERVICE_VERSION` | *(set to `MAPPROXY_VERSION` at build time)* | Version string reported as `service.version` in OTel resource attributes  |
 
 #### uWSGI
