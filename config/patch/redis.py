@@ -121,20 +121,19 @@ class RedisCache(TileCacheBase):
         try:
             log.debug('store_key, key: %s' % key)
             r = self.r.set(key, data)
+            if self.ttl:
+                # use ms expire times for unit-tests
+                self.r.pexpire(key, int(self.ttl * 1000))
         except redis.exceptions.TimeoutError as e:
             log.error('REDIS:store_key timeout error, returning false. %s' % e)
             return False
         except redis.exceptions.ConnectionError as e:
             log.error('Error during connection %s' % e)
-            return False  
+            return False
         except Exception as e:
             log.error('REDIS:store_key error  %s' % e)
             return False
 
-        
-        if self.ttl:
-            # use ms expire times for unit-tests
-            self.r.pexpire(key, int(self.ttl * 1000))
         return r
 
     def load_tile(self, tile, with_metadata=False, dimensions=None):
