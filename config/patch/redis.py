@@ -51,9 +51,9 @@ class RedisCache(TileCacheBase):
         self.lock_cache_id = 'redis-' + hashlib.md5((host + str(port) + prefix + str(db)).encode('utf-8')).hexdigest()
         self.ttl = ttl
         # Set a operation timeout nonnegative, floating point number expressing *seconds*.
-        self.socket_timeout = float(os.environ.get('SOCKET_TIMEOUT_SECONDS', 0.1))
+        self.socket_timeout = float(os.environ.get('SOCKET_TIMEOUT_SECONDS', "0.1"))
         # Set a connection timeout, nonnegative floating point number expressing *seconds*.
-        self.socket_connection_timeout = float(os.environ.get('SOCKET_CONNECTION_TIMEOUT_SECONDS', 0.1))
+        self.socket_connection_timeout = float(os.environ.get('SOCKET_CONNECTION_TIMEOUT_SECONDS', "0.1"))
 
         ssl_enabled = get_redis_variable("REDIS_TLS")
         cert_reqs = os.environ.get("SSL_CERT_REQS", None)
