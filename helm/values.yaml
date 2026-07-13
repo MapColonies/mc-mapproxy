@@ -237,7 +237,7 @@ nginx:
   # Declared explicitly so the workload's `app` label / selector / resource
   # names are specific to this service (app: nginx-mapproxy) rather than the
   # chart's generic default of `nginx` introduced in 2.2.1. See docs/adr.
-  nameOverride: nginx-mapproxy
+  nameOverride: mapproxy-nginx
   fullnameOverride: ""
   replicaCount: 1
   image:
