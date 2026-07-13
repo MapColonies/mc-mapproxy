@@ -71,8 +71,8 @@ RUN --mount=type=bind,source=config/patch/redis.py,target=/tmp/redis_patch.py \
     if [ "${PATCH_FILES}" = "true" ]; then \
     cp /tmp/redis_patch.py \
     /opt/venv/lib/python3.11/site-packages/mapproxy/cache/redis.py \
-    && python -c "import mapproxy.cache.redis" \
-    && echo "[patch] redis.py applied and import verified OK" \
+    && python -c "import sys, mapproxy.cache.redis as m; rem = getattr(m.RedisCache, '__abstractmethods__', frozenset()); sys.exit('RedisCache has unimplemented abstract methods: %s' % (set(rem),)) if rem else None" \
+    && echo "[patch] redis.py applied and import+abstractmethod check OK" \
     || { echo "[patch] redis.py FAILED — build aborted" >&2; exit 1; }; \
     else \
     echo "[patch] PATCH_FILES=false — redis.py patch skipped (upstream file unchanged)"; \
@@ -82,8 +82,8 @@ RUN --mount=type=bind,source=config/patch/s3.py,target=/tmp/s3_patch.py \
     if [ "${PATCH_FILES}" = "true" ]; then \
     cp /tmp/s3_patch.py \
     /opt/venv/lib/python3.11/site-packages/mapproxy/cache/s3.py \
-    && python -c "import mapproxy.cache.s3" \
-    && echo "[patch] s3.py applied and import verified OK" \
+    && python -c "import sys, mapproxy.cache.s3 as m; rem = getattr(m.S3Cache, '__abstractmethods__', frozenset()); sys.exit('S3Cache has unimplemented abstract methods: %s' % (set(rem),)) if rem else None" \
+    && echo "[patch] s3.py applied and import+abstractmethod check OK" \
     || { echo "[patch] s3.py FAILED — build aborted" >&2; exit 1; }; \
     else \
     echo "[patch] PATCH_FILES=false — s3.py patch skipped (upstream file unchanged)"; \
