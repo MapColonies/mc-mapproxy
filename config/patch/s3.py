@@ -87,7 +87,7 @@ class S3Cache(TileCacheBase):
             elif e.response['Error']['Code'] == '403':
                 raise S3ConnectionError('Access denied. Check your credentials')
             else:
-                reraise_exception(
+                raise reraise_exception(
                     S3ConnectionError('Unknown error: %s' % e),
                     sys.exc_info(),
                 )
@@ -128,21 +128,21 @@ class S3Cache(TileCacheBase):
             return
         self.is_cached(tile, dimensions=dimensions)
 
-def _set_metadata(self, response, tile):
-    # boto3 returns dict-like with LastModified (datetime) / ContentLength (int)
-    if 'LastModified' in response:
-        tile.timestamp = calendar.timegm(response['LastModified'].timetuple())
-    elif 'Last-Modified' in response:
-        from email.utils import parsedate_to_datetime
-        tile.timestamp = calendar.timegm(parsedate_to_datetime(response['Last-Modified']).timetuple())
+    def _set_metadata(self, response, tile):
+        # boto3 returns dict-like with LastModified (datetime) / ContentLength (int)
+        if 'LastModified' in response:
+            tile.timestamp = calendar.timegm(response['LastModified'].timetuple())
+        elif 'Last-Modified' in response:
+            from email.utils import parsedate_to_datetime
+            tile.timestamp = calendar.timegm(parsedate_to_datetime(response['Last-Modified']).timetuple())
 
-    if 'ContentLength' in response:
-        tile.size = int(response['ContentLength'])
-    elif 'Content-Length' in response:
-        try:
-            tile.size = int(response['Content-Length'])
-        except (TypeError, ValueError):
-            pass
+        if 'ContentLength' in response:
+            tile.size = int(response['ContentLength'])
+        elif 'Content-Length' in response:
+            try:
+                tile.size = int(response['Content-Length'])
+            except (TypeError, ValueError):
+                pass
 
     def is_cached(self, tile, dimensions=None):
         if tile.is_missing():
